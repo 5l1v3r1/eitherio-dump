@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -46,12 +46,16 @@ func main() {
 	seenQuestions := map[string]bool{}
 	questions := make([]Question, 0)
 
+	var errorCount uint32
+	var collisionCount uint32
+
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
 		questionsLock.Lock()
-		fmt.Println("Saving", len(questions), "results...")
+		fmt.Println("Saving", len(questions), "results with", atomic.LoadUint32(&errorCount),
+			"errors and", atomic.LoadUint32(&collisionCount), "collisions...")
 		flushQuestions(questions)
 		os.Exit(0)
 	}()
@@ -60,6 +64,7 @@ func main() {
 	for {
 		time.Sleep(backoff)
 		if query, err := makeQuery(); err != nil {
+			atomic.AddUint32(&errorCount, 1)
 			backoff *= 2
 			if backoff > MaxBackoff {
 				backoff = MaxBackoff
@@ -73,8 +78,12 @@ func main() {
 					questions = append(questions, question)
 					if 0 == len(questions)%WriteLen {
 						flushQuestions(questions)
-						log.Println("flushing", len(questions), "questions...")
+						fmt.Println("Flushing", len(questions), "results with",
+							atomic.LoadUint32(&errorCount), "errors and",
+							atomic.LoadUint32(&collisionCount), " collisions...")
 					}
+				} else {
+					atomic.AddUint32(&collisionCount, 1)
 				}
 			}
 			questionsLock.Unlock()
