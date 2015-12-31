@@ -26,6 +26,7 @@ type Question struct {
 	Count2 string `json:"option2_total"`
 
 	CreatorEmail string `json:"email"`
+	CreatorName  string `json:"display_name"`
 }
 
 func (q Question) Hash() string {
