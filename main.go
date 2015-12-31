@@ -92,7 +92,7 @@ func main() {
 }
 
 func makeQuery() (*QuestionQuery, error) {
-	resp, err := http.Get("http://either.io/questions/next")
+	resp, err := http.Get("http://either.io/questions/next/100")
 	if resp != nil {
 		defer resp.Body.Close()
 	}
